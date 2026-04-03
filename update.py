@@ -4,43 +4,58 @@ from datetime import datetime
 
 URL = "https://statistiques.public.lu/dam-assets/fr/donnees-autres-formats/indicateurs-court-terme/economie-totale-prix/E5010.xls"
 
-# Excel herunterladen und parsen (.xls → xlrd)
+print("📥 Lade STATEC Excel herunter...")
+
+# Excel herunterladen und parsen
 df = pd.read_excel(URL, sheet_name="FR_verso", header=None, engine="xlrd")
 
-# Suche nach den relevanten Sektionen (Struktur ist seit Jahren stabil)
-data = {}
-
-# --- C1 & C2 finden (letzte 24 Monate) ---
-for i, row in df.iterrows():
-    if isinstance(row[0], str) and "C1. Indice général raccordé" in str(row[0]):
+# =============================================
+# ROBUSTE SUCHE NACH C1 / C2 (Index + Moyenne)
+# =============================================
+start_c = None
+for i in range(len(df)):
+    row = df.iloc[i]
+    if isinstance(row[0], str) and "raccordé" in str(row[0]).lower():
         start_c = i + 2
+        print(f"✅ C1-Abschnitt gefunden bei Zeile {i}")
         break
 
+if start_c is None:
+    raise ValueError("❌ C1-Abschnitt nicht gefunden. Excel-Struktur hat sich stark geändert.")
+
+# Letzte 24 Monate auslesen
 series = []
-for i in range(start_c, start_c + 60):  # max 5 Jahre
+for i in range(start_c, start_c + 60):
     if i >= len(df):
         break
     row = df.iloc[i]
-    if isinstance(row[0], str) and "/" in str(row[0]) and len(str(row[0])) == 7:  # z.B. "2026/02"
-        date = str(row[0])
-        c1 = float(row[3]) if pd.notna(row[3]) else None   # Spalte C1 meist Index 3-4
-        c2 = float(row[5]) if pd.notna(row[5]) else None   # C2 meist weiter rechts
-        if c1 and c2:
-            series.append({"date": date, "c1": round(c1, 2), "c2": round(c2, 2)})
+    if isinstance(row[0], str) and "/" in str(row[0]) and len(str(row[0])) == 7:
+        date_str = str(row[0])
+        c1 = float(row[3]) if pd.notna(row[3]) else None
+        c2 = float(row[5]) if pd.notna(row[5]) else None
+        if c1 is not None and c2 is not None:
+            series.append({"date": date_str, "c1": round(c1, 2), "c2": round(c2, 2)})
 
-data["series"] = series[-24:]  # letzte 24 Monate
-
-# Aktuellste Werte
+data = {}
+data["series"] = series[-24:]          # letzte 24 Monate
 latest = series[-1]
 data["latest_date"] = latest["date"]
 data["c1"] = latest["c1"]
 data["c2"] = latest["c2"]
 
-# --- Section D: Cotes d'application & échéance ---
-for i, row in df.iterrows():
-    if isinstance(row[0], str) and "D1" in str(row[0]) and "Cotes d" in str(row[0]):
+# =============================================
+# ROBUSTE SUCHE NACH COTES D'APPLICATION
+# =============================================
+cote_start = None
+for i in range(len(df)):
+    row = df.iloc[i]
+    if isinstance(row[0], str) and ("cotes d'application" in str(row[0]).lower() or "d1" in str(row[0]).lower()):
         cote_start = i + 3
+        print(f"✅ Cotes-Abschnitt gefunden bei Zeile {i}")
         break
+
+if cote_start is None:
+    raise ValueError("❌ Cotes-Abschnitt nicht gefunden.")
 
 cotes = []
 for i in range(cote_start, cote_start + 50):
@@ -50,9 +65,8 @@ for i in range(cote_start, cote_start + 50):
     if pd.notna(row[0]) and isinstance(row[0], (int, float)):
         cote_ech = float(row[0])
         cote_app = float(row[1]) if pd.notna(row[1]) else None
-        date_app = str(row[3]) if pd.notna(row[3]) else None
         if cote_app:
-            cotes.append({"cote_ech": cote_ech, "cote_app": cote_app, "date_app": date_app})
+            cotes.append({"cote_ech": cote_ech, "cote_app": cote_app})
 
 if cotes:
     last = cotes[-1]
@@ -62,11 +76,11 @@ if cotes:
     data["percent_to_next"] = round((data["c2"] / last["cote_ech"] - 1) * 100, 2)
 
 # Timestamp
-data["updated"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+data["updated"] = datetime.utcnow().strftime("%d.%m.%Y %H:%M UTC")
 
 # Speichern
 import json
 with open("data.json", "w", encoding="utf-8") as f:
     json.dump(data, f, ensure_ascii=False, indent=2)
 
-print("✅ Update erfolgreich – neueste moyenne semestrielle:", data["c2"])
+print(f"✅ Update erfolgreich! Moyenne semestrielle = {data['c2']} (Stand {data['latest_date']})")
