@@ -9,106 +9,126 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
-  <div class="max-w-5xl mx-auto p-8">
-    <h1 class="text-4xl font-bold text-lime-400 mb-2">🇱🇺 Luxemburg Index-Tranche</h1>
-    <p class="text-gray-400 mb-8">Live-Stand des STATEC indice raccordé base 1.1.1948 • Automatisch aktualisiert</p>
+  <div class="max-w-5xl mx-auto p-4 md:p-8">
+    <div class="flex items-center gap-3 mb-2">
+      <h1 class="text-3xl md:text-4xl font-bold text-lime-400">🇱🇺 Luxemburg Index-Tranche</h1>
+      <button onclick="showInfo()" class="text-lime-400 hover:text-lime-300 text-2xl">
+        <i class="fas fa-info-circle"></i>
+      </button>
+    </div>
+    <p class="text-gray-400 mb-8 text-sm md:text-base">Live-Stand • STATEC indice raccordé base 1.1.1948</p>
 
-    <div id="status" class="mb-8"></div>
-
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="bg-gray-900 rounded-2xl p-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+      <div class="bg-gray-900 rounded-2xl p-5 md:p-6">
         <p class="text-sm text-gray-400">Letzte Moyenne semestrielle (C2)</p>
-        <p id="c2" class="text-5xl font-bold text-white">—</p>
-        <p id="date" class="text-sm text-lime-400"></p>
+        <p id="c2" class="text-4xl md:text-5xl font-bold text-white">—</p>
+        <p id="date" class="text-xs md:text-sm text-lime-400"></p>
       </div>
-      <div class="bg-gray-900 rounded-2xl p-6">
+      <div class="bg-gray-900 rounded-2xl p-5 md:p-6">
         <p class="text-sm text-gray-400">Aktuelle Cote d’application</p>
-        <p id="cote_app" class="text-5xl font-bold text-white">—</p>
+        <p id="cote_app" class="text-4xl md:text-5xl font-bold text-white">—</p>
       </div>
-      <div class="bg-gray-900 rounded-2xl p-6">
-        <p class="text-sm text-gray-400">Nächster Schwellenwert</p>
-        <p id="next" class="text-5xl font-bold text-lime-400">—</p>
-        <p id="to_next" class="text-sm"></p>
+      <div class="bg-gray-900 rounded-2xl p-5 md:p-6">
+        <p class="text-sm text-gray-400">Noch fehlende Punkte bis +2,5 % Tranche</p>
+        <p id="missing" class="text-4xl md:text-5xl font-bold text-lime-400">—</p>
+        <p id="to_next" class="text-xs md:text-sm"></p>
       </div>
     </div>
 
-    <div class="mt-10">
-      <canvas id="chart" height="130"></canvas>
+    <div class="mt-8 md:mt-10">
+      <canvas id="chart" height="140"></canvas>
     </div>
 
-    <div class="mt-12 text-sm text-gray-400">
+    <div class="mt-8 text-xs md:text-sm text-gray-400">
       <p>Quelle: <a href="https://statistiques.public.lu/dam-assets/fr/donnees-autres-formats/indicateurs-court-terme/economie-totale-prix/E5010.xls" class="underline">STATEC E5010.xls</a></p>
-      <p id="last_updated" class="mt-4"></p>
+      <p id="last_updated" class="mt-3"></p>
+    </div>
+  </div>
+
+  <!-- Info Modal -->
+  <div id="infoModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+    <div class="bg-gray-900 rounded-3xl max-w-md mx-4 p-6 text-gray-100">
+      <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+        <i class="fas fa-info-circle text-lime-400"></i>
+        Warum war 2014/15 der Index so hoch?
+      </h2>
+      <p class="text-sm leading-relaxed">
+        Zwischen 2013 und 2015 gab es eine starke Inflationswelle (vor allem Energie und Lebensmittel wurden teurer).<br><br>
+        Der Index stieg deshalb schnell an. Danach folgte eine lange ruhige Phase (2015–2020) mit sehr niedriger Inflation – die Preise stiegen kaum oder sanken sogar.<br><br>
+        Deshalb steht der Index heute (2026) erst wieder ungefähr auf dem gleichen Niveau wie damals. In der ruhigen Phase wurden auch deutlich weniger Index-Tranchen ausgelöst.
+      </p>
+      <button onclick="hideInfo()" class="mt-6 w-full bg-lime-400 text-gray-950 font-bold py-3 rounded-2xl">Verstanden</button>
     </div>
   </div>
 
   <script>
+    function showInfo() { document.getElementById("infoModal").classList.remove("hidden"); }
+    function hideInfo() { document.getElementById("infoModal").classList.add("hidden"); }
+
     fetch('data.json')
       .then(r => r.json())
       .then(d => {
+        // Karten
         document.getElementById("c2").textContent = d.c2;
         document.getElementById("date").textContent = `Stand: ${d.latest_date}`;
         document.getElementById("cote_app").textContent = d.last_cote_app;
-        document.getElementById("next").textContent = d.next_threshold;
-        document.getElementById("to_next").innerHTML = `Noch <span class="font-bold">${(d.next_threshold - d.c2).toFixed(2)}</span> Punkte (${d.percent_to_next.toFixed(1)} % bis +2,5 % Tranche)`;
+        document.getElementById("missing").textContent = d.missing_points.toFixed(2);
+        document.getElementById("to_next").innerHTML = `(${d.percent_to_next.toFixed(1)} % bis +2,5 %)`;
 
         document.getElementById("last_updated").textContent = `Letzte Aktualisierung: ${d.updated}`;
 
-        // === NEUER CHART MIT SCHWELLENWERT-LINIEN ===
-        const ctx = document.getElementById("chart");
-        const labels = d.series.map(s => s.date);
+        // === CHART ===
+        const rawLabels = d.series.map(s => s.date);
+        const labels = rawLabels.map(dateStr => {
+          const parts = dateStr.split('/');
+          if (parts.length === 2) {
+            let p1 = parts[0].trim();
+            let p2 = parts[1].trim();
+            if (p1.length === 4 && p2.length === 2) {
+              return `20${p2}/${p1.slice(2)}`;   // "2015/14" → "2014/15"
+            }
+          }
+          return dateStr;
+        });
 
+        const ctx = document.getElementById("chart");
         new Chart(ctx, {
           type: 'line',
           data: {
             labels: labels,
             datasets: [
+              { label: 'C1 Index', data: d.series.map(s => s.c1), borderColor: '#a3e635', borderWidth: 3, tension: 0.2 },
+              { label: 'C2 Moyenne semestrielle', data: d.series.map(s => s.c2), borderColor: '#22d3ee', borderWidth: 3, tension: 0.2 },
+              // Tranche-Punkte (nur die, die in den letzten 24 Monaten liegen)
               {
-                label: 'C1 Index',
-                data: d.series.map(s => s.c1),
-                borderColor: '#a3e635',
-                tension: 0.2,
-                borderWidth: 3
-              },
-              {
-                label: 'C2 Moyenne semestrielle',
-                data: d.series.map(s => s.c2),
-                borderColor: '#22d3ee',
-                tension: 0.2,
-                borderWidth: 3
-              },
-              {
-                label: 'Aktueller Schwellenwert (Cote d’échéance)',
-                data: Array(labels.length).fill(d.last_cote_ech),
+                label: 'Index-Tranche (+2,5 %)',
+                data: d.tranches
+                  .filter(t => rawLabels.includes(t.date))
+                  .map(t => {
+                    const idx = rawLabels.indexOf(t.date);
+                    return idx >= 0 ? d.series[idx].c2 : null;
+                  }),
                 borderColor: '#f43f5e',
-                borderDash: [8, 4],
-                borderWidth: 3,
-                pointRadius: 0,
-                tension: 0
-              },
-              {
-                label: 'Nächster Schwellenwert (+2,5 % Tranche)',
-                data: Array(labels.length).fill(d.next_threshold),
-                borderColor: '#eab308',
-                borderDash: [2, 2],
-                borderWidth: 2,
-                pointRadius: 0,
-                tension: 0
+                backgroundColor: '#f43f5e',
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                type: 'scatter',
+                showLine: false
               }
             ]
           },
           options: {
+            responsive: true,
+            maintainAspectRatio: false,
             plugins: {
-              legend: { position: 'top', labels: { color: '#e5e7eb', boxWidth: 12 } }
+              legend: { position: 'top', labels: { color: '#e5e7eb', boxWidth: 12, padding: 15 } },
+              tooltip: { mode: 'index', intersect: false }
             },
             scales: {
-              y: {
-                grid: { color: '#374151' },
-                ticks: { color: '#e5e7eb' }
-              },
+              y: { grid: { color: '#374151' }, ticks: { color: '#e5e7eb' } },
               x: {
                 grid: { color: '#374151' },
-                ticks: { color: '#e5e7eb', maxRotation: 45 }
+                ticks: { color: '#e5e7eb', maxRotation: 45, minRotation: 45, autoSkip: true }
               }
             }
           }
