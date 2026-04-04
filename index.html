@@ -10,6 +10,7 @@
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
   <div class="max-w-5xl mx-auto p-4 md:p-8">
+
     <div class="flex items-center gap-3 mb-2">
       <h1 class="text-3xl md:text-4xl font-bold text-lime-400">🇱🇺 Luxemburg Index-Tranche</h1>
       <button onclick="showInfo()" class="text-lime-400 hover:text-lime-300 text-2xl">
@@ -18,6 +19,7 @@
     </div>
     <p class="text-gray-400 mb-8 text-sm md:text-base">Live-Stand • STATEC indice raccordé base 1.1.1948</p>
 
+    <!-- Karten -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
       <div class="bg-gray-900 rounded-2xl p-5 md:p-6">
         <p class="text-sm text-gray-400">Letzte Moyenne semestrielle (C2)</p>
@@ -35,28 +37,42 @@
       </div>
     </div>
 
+    <!-- Chart -->
     <div class="mt-8 md:mt-10">
-      <canvas id="chart" height="140"></canvas>
+      <canvas id="chart" height="220"></canvas>
     </div>
 
-    <div class="mt-8 text-xs md:text-sm text-gray-400">
-      <p>Quelle: <a href="https://statistiques.public.lu/dam-assets/fr/donnees-autres-formats/indicateurs-court-terme/economie-totale-prix/E5010.xls" class="underline">STATEC E5010.xls</a></p>
-      <p id="last_updated" class="mt-3"></p>
+    <!-- Aufklappbare Historische Liste -->
+    <div class="mt-10">
+      <details class="group bg-gray-900 rounded-2xl p-5">
+        <summary class="flex items-center justify-between cursor-pointer text-lg font-semibold">
+          <span>📜 Historische Index-Tranchen (letzte 30)</span>
+          <i class="fas fa-chevron-down transition group-open:rotate-180"></i>
+        </summary>
+        
+        <div id="trancheList" class="mt-6 space-y-3"></div>
+      </details>
+    </div>
+
+    <!-- Nächste Veröffentlichung -->
+    <div class="mt-8 text-xs md:text-sm text-gray-400 bg-gray-900 rounded-2xl p-4">
+      <p><strong>Nächste STATEC-Zahlen erwartet:</strong> voraussichtlich zwischen dem <span id="nextRelease" class="font-medium text-lime-400">4. und 9. des Folgemonats</span></p>
+      <p id="last_updated" class="mt-2"></p>
+    </div>
+
+    <div class="mt-6 text-xs text-gray-500">
+      Quelle: <a href="https://statistiques.public.lu/dam-assets/fr/donnees-autres-formats/indicateurs-court-terme/economie-totale-prix/E5010.xls" class="underline">STATEC E5010.xls</a>
     </div>
   </div>
 
-  <!-- Info Modal -->
+  <!-- Info Modal (wie vorher) -->
   <div id="infoModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-    <div class="bg-gray-900 rounded-3xl max-w-md mx-4 p-6 text-gray-100">
+    <div class="bg-gray-900 rounded-3xl max-w-md mx-4 p-6">
       <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
         <i class="fas fa-info-circle text-lime-400"></i>
         Warum war 2014/15 der Index so hoch?
       </h2>
-      <p class="text-sm leading-relaxed">
-        Zwischen 2013 und 2015 gab es eine starke Inflationswelle (vor allem Energie und Lebensmittel wurden teurer).<br><br>
-        Der Index stieg deshalb schnell an. Danach folgte eine lange ruhige Phase (2015–2020) mit sehr niedriger Inflation – die Preise stiegen kaum oder sanken sogar.<br><br>
-        Deshalb steht der Index heute (2026) erst wieder ungefähr auf dem gleichen Niveau wie damals. In der ruhigen Phase wurden auch deutlich weniger Index-Tranchen ausgelöst.
-      </p>
+      <p class="text-sm leading-relaxed">Zwischen 2013 und 2015 gab es eine starke Inflationswelle (Energie + Lebensmittel). Danach folgte eine sehr ruhige Phase mit kaum Inflation – deshalb steht der Index heute erst wieder ungefähr auf dem gleichen Niveau wie damals.</p>
       <button onclick="hideInfo()" class="mt-6 w-full bg-lime-400 text-gray-950 font-bold py-3 rounded-2xl">Verstanden</button>
     </div>
   </div>
@@ -77,62 +93,82 @@
 
         document.getElementById("last_updated").textContent = `Letzte Aktualisierung: ${d.updated}`;
 
-        // === CHART ===
+        // Chart (jetzt wieder klar und lesbar)
         const rawLabels = d.series.map(s => s.date);
         const labels = rawLabels.map(dateStr => {
           const parts = dateStr.split('/');
           if (parts.length === 2) {
             let p1 = parts[0].trim();
             let p2 = parts[1].trim();
-            if (p1.length === 4 && p2.length === 2) {
-              return `20${p2}/${p1.slice(2)}`;   // "2015/14" → "2014/15"
-            }
+            if (p1.length === 4 && p2.length === 2) return `20${p2}/${p1.slice(2)}`;
           }
           return dateStr;
         });
 
-        const ctx = document.getElementById("chart");
-        new Chart(ctx, {
+        new Chart(document.getElementById("chart"), {
           type: 'line',
           data: {
             labels: labels,
             datasets: [
               { label: 'C1 Index', data: d.series.map(s => s.c1), borderColor: '#a3e635', borderWidth: 3, tension: 0.2 },
-              { label: 'C2 Moyenne semestrielle', data: d.series.map(s => s.c2), borderColor: '#22d3ee', borderWidth: 3, tension: 0.2 },
-              // Tranche-Punkte (nur die, die in den letzten 24 Monaten liegen)
-              {
-                label: 'Index-Tranche (+2,5 %)',
-                data: d.tranches
-                  .filter(t => rawLabels.includes(t.date))
-                  .map(t => {
-                    const idx = rawLabels.indexOf(t.date);
-                    return idx >= 0 ? d.series[idx].c2 : null;
-                  }),
-                borderColor: '#f43f5e',
-                backgroundColor: '#f43f5e',
-                pointRadius: 6,
-                pointHoverRadius: 8,
-                type: 'scatter',
-                showLine: false
-              }
+              { label: 'C2 Moyenne semestrielle', data: d.series.map(s => s.c2), borderColor: '#22d3ee', borderWidth: 3, tension: 0.2 }
             ]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-              legend: { position: 'top', labels: { color: '#e5e7eb', boxWidth: 12, padding: 15 } },
-              tooltip: { mode: 'index', intersect: false }
-            },
+            plugins: { legend: { position: 'top', labels: { color: '#e5e7eb', boxWidth: 12 } } },
             scales: {
               y: { grid: { color: '#374151' }, ticks: { color: '#e5e7eb' } },
-              x: {
-                grid: { color: '#374151' },
-                ticks: { color: '#e5e7eb', maxRotation: 45, minRotation: 45, autoSkip: true }
-              }
+              x: { grid: { color: '#374151' }, ticks: { color: '#e5e7eb', maxRotation: 45 } }
             }
           }
         });
+
+        // === Aufklappbare Liste pro Jahr ===
+        const container = document.getElementById("trancheList");
+        container.innerHTML = "";
+
+        // Jahre gruppieren
+        const years = {};
+        d.tranches.forEach(t => {
+          let year = "unbekannt";
+          if (t.date && t.date.includes('/')) {
+            const p = t.date.split('/');
+            year = p[0].length === 4 ? p[0] : (p[1] ? "20" + p[1] : "unbekannt");
+          }
+          if (!years[year]) years[year] = [];
+          years[year].push(t);
+        });
+
+        // Sortiert absteigend
+        Object.keys(years).sort((a,b) => b - a).forEach(year => {
+          const div = document.createElement("details");
+          div.className = "bg-gray-800 rounded-xl p-4";
+          div.innerHTML = `
+            <summary class="flex justify-between cursor-pointer font-medium">
+              <span>Tranchen im Jahr ${year}</span>
+              <i class="fas fa-chevron-down transition group-open:rotate-180"></i>
+            </summary>
+            <div class="mt-4 space-y-2 text-sm">
+              ${years[year].map(t => `
+                <div class="flex justify-between bg-gray-900 rounded-lg px-4 py-3">
+                  <span class="font-medium">${t.date || "—"}</span>
+                  <span>bei <strong>${t.cote}</strong> Punkten</span>
+                </div>
+              `).join('')}
+            </div>
+          `;
+          container.appendChild(div);
+        });
+
+        // Nächste Veröffentlichung (einfache Schätzung)
+        const latest = d.latest_date || "";
+        if (latest.includes('/')) {
+          const month = parseInt(latest.split('/')[1] || "01");
+          const nextMonth = month === 12 ? "Januar" : new Date(2026, month).toLocaleString('de-DE', {month: 'long'});
+          document.getElementById("nextRelease").textContent = `4. und 9. ${nextMonth}`;
+        }
       });
   </script>
 </body>
