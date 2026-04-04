@@ -29,9 +29,48 @@
   "latest_date": "2022/21",
   "c1": 1010.8,
   "c2": 1012.69,
+  "tranches": [
+    {
+      "date": "unbekannt",
+      "cote": 422.32
+    },
+    {
+      "date": "unbekannt",
+      "cote": 426.54
+    },
+    {
+      "date": "unbekannt",
+      "cote": 428.67
+    },
+    {
+      "date": "unbekannt",
+      "cote": 439.38
+    },
+    {
+      "date": "unbekannt",
+      "cote": 450.36
+    },
+    {
+      "date": "unbekannt",
+      "cote": 461.61
+    },
+    {
+      "date": "unbekannt",
+      "cote": 473.15
+    },
+    {
+      "date": "unbekannt",
+      "cote": 484.97
+    },
+    {
+      "date": "unbekannt",
+      "cote": 497.09
+    }
+  ],
   "last_cote_app": 497.09,
-  "last_cote_ech": 520.4,
-  "next_threshold": 533.41,
-  "percent_to_next": 94.6,
-  "updated": "03.04.2026 10:50 UTC"
+  "last_cote_ech": 484.97,
+  "next_threshold": 509.52,
+  "missing_points": -503.17,
+  "percent_to_next": 103.72,
+  "updated": "04.04.2026 08:12 UTC"
 }
